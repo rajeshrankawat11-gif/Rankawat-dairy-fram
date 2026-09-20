@@ -1,0 +1,17 @@
+format_version: '13'
+project_type: android
+workflows:
+  primary:
+    steps:
+    - git-clone@8: {}
+    - script@1:
+        title: Build Rankawat Dairy Farm APK
+        inputs:
+        - content: |
+            #!/usr/bin/env bash
+            set -ex
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon
+    - deploy-to-bitrise-io@2:
+        inputs:
+        - deploy_path: "$BITRISE_SOURCE_DIR/app/build/outputs/apk/debug/app-debug.apk"
