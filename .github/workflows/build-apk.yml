@@ -14,6 +14,104 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Extract complete build package
+        shell: bash
+        run: |
+          set -e
+
+          echo "Finding complete package..."
+
+          OUTER_ZIP=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
+
+          if [ -z "$OUTER_ZIP" ]; then
+            echo "Complete package ZIP not found"
+            exit 1
+          fi
+
+          echo "Found: $OUTER_ZIP"
+
+          mkdir -p outer
+          unzip -q "$OUTER_ZIP" -d outer
+
+          echo "Finding Android source ZIP..."
+
+          SOURCE_ZIP=$(find outer -type f -name '*android-source*.zip' | head -n 1)
+
+          if [ -z "$SOURCE_ZIP" ]; then
+            echo "Android source ZIP not found"
+            find outer -type f
+            exit 1
+          fi
+
+          echo "Found source: $SOURCE_ZIP"
+
+          mkdir -p android
+          unzip -q "$SOURCE_ZIP" -d android
+
+          ROOT=$(find android -type f -name settings.gradle -printf '%h\n' | head -n 1)
+
+          if [ -z "$ROOT" ]; then
+            echo "Android project not found"
+            find android -maxdepth 5 -type f
+            exit 1
+          fi
+
+          echo "Android project found at: $ROOT"
+
+          cp -a "$ROOT"/. .
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        run: |
+          gradle assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            release/Rankawat-Dairy-Farm.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rankawat-Dairy-Farm
+          path: release/Rankawat-Dairy-Farm.apk
+          if-no-files-found: errorname: Build Rankawat Dairy Farm APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Extract Android project
         shell: bash
         run: |
